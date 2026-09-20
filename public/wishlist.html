@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wishlist</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content">
+      <h2>My Wishlist</h2>
+      <div id="wishlistGrid" class="grid"></div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    fetch('/api/wishlist')
+      .then(res => res.json())
+      .then(products => {
+        const grid = document.getElementById('wishlistGrid');
+        if (!products.length) {
+          grid.innerHTML = '<div class="empty-cart">Your wishlist is empty. <a href="index.html">Browse products →</a></div>';
+          return;
+        }
+        grid.innerHTML = products.map(p => `
+  <a href="product.html?id=${p.id}" class="card">
+    <img src="${p.image}" class="card-img" alt="${p.name}" onerror="this.src='https://picsum.photos/seed/${p.id}/500/500'">
+    <span class="cat-badge">${p.category}</span>
+    <h3>${p.name}</h3>
+    <div class="rating">⭐ ${p.rating} <span class="review-count">(${p.review_count})</span></div>
+    <p>₹${Number(p.price).toFixed(2)}</p>
+    <span class="view-details-link">View Details →</span>
+  </a>
+`).join('');
+      });
+  </script>
+</body>
+</html>

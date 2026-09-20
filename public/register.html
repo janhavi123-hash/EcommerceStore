@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Register</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-form">
+      <h2>Create Account ✨</h2>
+      <p class="subtitle">Join us and start shopping</p>
+      <input type="text" id="name" placeholder="Full Name" required>
+      <input type="email" id="email" placeholder="Email" required>
+  <input type="password" id="password" placeholder="Password" required>
+<div class="field-hint">Password must be at least 8 characters, with 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character (!@#$%^&*)</div>
+      <button onclick="register()">Register</button>
+      <p>Already have an account? <a href="login.html">Login</a></p>
+    </div>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    function register() {
+  const name = document.getElementById('name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!name || !email || !password) {
+    return showToast('Please fill in all fields', 'error');
+  }if (name.length < 2) {
+  return showToast('Please enter your full name', 'error');
+}
+
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+  if (!emailPattern.test(email)) {
+    return showToast('Please enter a valid email address', 'error');
+  }
+  const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+if (!passwordPattern.test(password)) {
+ return showToast('Password must be 8+ chars with uppercase, lowercase, number & special character', 'error');
+}
+
+  fetch('/api/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, password })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.error) return showToast(data.error, 'error');
+    showToast('Account created!', 'success');
+  setTimeout(() => location.href = 'index.html', 800);
+  })
+  .catch(() => showToast('Something went wrong. Please try again.', 'error'));
+}
+  </script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Orders</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content">
+      <h2>My Orders</h2>
+      <div id="ordersList"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+
+    fetch('/api/orders')
+      .then(res => {
+        if (res.status === 401) { location.href = 'login.html'; return null; }
+        return res.json();
+      })
+      .then(orders => {
+        if (!orders) return;
+        const container = document.getElementById('ordersList');
+        if (!orders.length) {
+          container.innerHTML = '<div class="empty-cart">You haven\'t placed any orders yet. <a href="index.html">Start shopping →</a></div>';
+          return;
+        }
+
+        orders.forEach(order => {
+          const hoursSince = (Date.now() - new Date(order.created_at)) / (1000 * 60 * 60);
+          if (hoursSince > 72) order.status = 'Delivered';
+          else if (hoursSince > 24) order.status = 'Shipped';
+          else order.status = 'Processing';
+        });
+
+        const steps = ['Processing', 'Shipped', 'Delivered'];
+
+        container.innerHTML = orders.map(order => {
+          const currentStep = steps.indexOf(order.status);
+          return `
+            <div class="order-card">
+              <div class="order-header">
+                <div>
+                  <strong>Order #${order.id}</strong>
+                  <span class="order-date">${new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+                <span class="order-status">${order.status}</span>
+              </div>
+              <div class="status-stepper">
+                ${steps.map((step, i) => `
+                  <div class="step ${i <= currentStep ? 'done' : ''}">
+                    <div class="step-dot"></div>
+                    <span>${step}</span>
+                  </div>
+                  ${i < steps.length - 1 ? '<div class="step-line"></div>' : ''}
+                `).join('')}
+              </div>
+              <div class="order-items">
+                ${order.items.map(item => `
+                  <div class="order-item-row">
+                    <img src="${item.image}" alt="${item.name}" onerror="this.src='https://picsum.photos/seed/o${order.id}/60/60'">
+                    <span class="order-item-name">${item.name} x${item.quantity}</span>
+                    <span class="order-item-price">₹${(Number(item.price) * item.quantity).toFixed(2)}</span>
+                  </div>
+                `).join('')}
+              </div>
+              <div class="order-footer">
+                <span>Paid via ${order.payment_method || 'COD'}</span>
+                <strong>Total: ₹${Number(order.total).toFixed(2)}</strong>
+              </div>
+            </div>
+          `;
+        }).join('');
+      })
+      .catch(() => {
+        document.getElementById('ordersList').innerHTML = '<p>Could not load orders.</p>';
+      });
+  </script>
+</body>
+</html>

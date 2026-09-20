@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Checkout</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content">
+      <h2>Checkout</h2>
+      <div class="checkout-layout">
+        <div class="checkout-box">
+          <h4>Delivery Address</h4>
+          <input type="text" id="fullName" placeholder="Full Name">
+          <input type="text" id="address" placeholder="Address">
+          <input type="text" id="city" placeholder="City">
+          <input type="text" id="pincode" placeholder="Pincode">
+          <input type="text" id="phone" placeholder="Phone Number">
+
+          <h4>Payment Method</h4>
+          <div class="payment-options">
+            <label class="payment-option">
+              <input type="radio" name="payment" value="COD" checked>
+              💵 Cash on Delivery
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="payment" value="UPI">
+              📱 UPI
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="payment" value="Card">
+              💳 Credit / Debit Card
+            </label>
+          </div>
+        </div>
+        <div class="checkout-summary">
+          <div id="orderSummary"></div>
+          <button onclick="placeOrder()">Place Order</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+
+    // Pre-fill saved address if it exists
+    fetch('/api/address')
+      .then(res => res.json())
+      .then(addr => {
+        if (addr) {
+          document.getElementById('fullName').value = addr.full_name || '';
+          document.getElementById('address').value = addr.address || '';
+          document.getElementById('city').value = addr.city || '';
+          document.getElementById('pincode').value = addr.pincode || '';
+          document.getElementById('phone').value = addr.phone || '';
+        }
+      });
+
+    // Load order summary
+    fetch('/api/cart')
+      .then(res => res.json())
+      .then(items => {
+        let total = 0;
+        const rows = items.map(i => {
+          total += Number(i.price) * i.quantity;
+          return `<div class="summary-row"><span>${i.name} x${i.quantity}</span><span>₹${(Number(i.price)*i.quantity).toFixed(2)}</span></div>`;
+        }).join('');
+        document.getElementById('orderSummary').innerHTML = `
+          <p class="summary-title">Order Summary</p>
+          ${rows}
+          <div class="summary-row total-row"><span>Total</span><span>₹${total.toFixed(2)}</span></div>
+        `;
+      });
+
+    function placeOrder() {
+  const fields = ['fullName','address','city','pincode','phone'];
+  for (const f of fields) {
+    if (!document.getElementById(f).value.trim()) {
+      return showToast('Please fill in all delivery fields', 'error');
+    }
+  }
+  const payment = document.querySelector('input[name="payment"]:checked').value;
+
+  // Save address for next time
+  fetch('/api/address', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fullName: fullName.value, address: address.value,
+      city: city.value, pincode: pincode.value, phone: phone.value
+    })
+  });
+
+  if (payment === 'COD') {
+    submitOrder(payment);
+  } else {
+    fetch('/api/create-razorpay-order', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        const options = {
+          key: data.keyId,
+          amount: data.amount,
+          currency: 'INR',
+          name: 'My Store',
+          order_id: data.orderId,
+          handler: function(response) {
+            submitOrder(payment);
+          },
+          theme: { color: '#6366f1' }
+        };
+        const rzp = new Razorpay(options);
+        rzp.open();
+      })
+      .catch(() => showToast('Could not start payment', 'error'));
+  }
+}
+
+function submitOrder(payment) {
+  fetch('/api/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentMethod: payment })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) return showToast(data.error, 'error');
+      showToast(`Order placed via ${payment}! Order #${data.orderId}`, 'success');
+      setTimeout(() => location.href = 'index.html', 1500);
+    })
+    .catch(() => showToast('Checkout failed', 'error'));
+}
+  </script>
+</body>
+</html>

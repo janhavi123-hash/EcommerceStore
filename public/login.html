@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Login</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-form">
+      <h2>Welcome Back 👋</h2>
+      <p class="subtitle">Login to continue shopping</p>
+      <input type="email" id="email" placeholder="Email">
+      <input type="password" id="password" placeholder="Password">
+      <button onclick="login()">Login</button>
+      <p>No account? <a href="register.html">Register</a></p>
+    </div>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    function login() {
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+  if (data.error) return showToast(data.error, 'error');
+  showToast('Welcome back!', 'success');
+  setTimeout(() => location.href = 'index.html', 600);
+});
+    }
+  </script>
+</body>
+</html>

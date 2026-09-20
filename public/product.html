@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Product Details</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content" id="productDetail"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    const id = new URLSearchParams(location.search).get('id');
+
+    function trackRecentlyViewed(productId) {
+  let recent = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+  recent = recent.filter(pid => pid !== productId);
+  recent.unshift(productId);
+  recent = recent.slice(0, 5);
+  localStorage.setItem('recentlyViewed', JSON.stringify(recent));
+}
+    let selectedRating = 5;
+
+    fetch('/api/products/' + id)
+      .then(res => res.json())
+      .then(p => {
+        document.getElementById('productDetail').innerHTML = `
+          <div class="product-page">
+            <div class="product-image-box">
+              <img src="${p.image}" alt="${p.name}" onerror="this.src='https://picsum.photos/seed/${p.id}/500/500'">
+            </div>
+            <div class="product-info">
+              <h2>${p.name}</h2>
+              <div class="rating">⭐ ${p.rating} <span class="review-count">(${p.review_count} ratings)</span></div>
+              <p class="price">₹${Number(p.price).toFixed(2)}</p>
+              <p class="desc">${p.description}</p>
+              <p class="stock-line">${p.stock > 0 ? `✅ In stock (${p.stock} available)` : '❌ Out of stock'}</p>
+              <div class="qty-row">
+                <label>Quantity:</label>
+                <input type="number" id="qty" value="1" min="1" max="${p.stock}">
+              </div>
+              <div class="btn-row">
+                <button class="btn-cart" onclick="addToCart(${p.id})">🛒 Add to Cart</button>
+                <button class="btn-buy" onclick="buyNow(${p.id})">⚡ Buy Now</button>
+                <button class="btn-wishlist" id="wishlistBtn" onclick="toggleWishlist(${p.id})">🤍</button>
+              </div>
+            </div>
+          </div>
+          <div class="reviews-section">
+            <h3>Customer Reviews</h3>
+            <div class="review-form">
+              <p class="star-label">Your Rating:</p>
+              <div class="star-picker" id="starPicker">
+                <span data-val="1">☆</span><span data-val="2">☆</span><span data-val="3">☆</span><span data-val="4">☆</span><span data-val="5">☆</span>
+              </div>
+              <textarea id="reviewComment" placeholder="Write your review..."></textarea>
+              <button onclick="submitReview(${p.id})">Submit Review</button>
+            </div>
+            <div id="reviewList"></div>
+          </div>
+        `;
+
+        trackRecentlyViewed(p.id);
+
+        // Star rating picker
+        document.querySelectorAll('#starPicker span').forEach(star => {
+          star.addEventListener('click', () => {
+            selectedRating = parseInt(star.dataset.val);
+            updateStars();
+          });
+        });
+        updateStars();
+
+        // Check wishlist status
+        fetch('/api/wishlist')
+          .then(res => res.json())
+          .then(items => {
+            const isWishlisted = items.some(item => item.id === p.id);
+            document.getElementById('wishlistBtn').textContent = isWishlisted ? '❤️' : '🤍';
+          })
+          .catch(() => {});
+
+        loadReviews(p.id);
+      })
+      .catch(() => {
+        document.getElementById('productDetail').innerHTML = '<p>Could not load product.</p>';
+      });
+
+    function updateStars() {
+      document.querySelectorAll('#starPicker span').forEach(s => {
+        s.textContent = parseInt(s.dataset.val) <= selectedRating ? '★' : '☆';
+      });
+    }
+
+    function addToCart(productId) {
+      const quantity = parseInt(document.getElementById('qty').value);
+      fetch('/api/cart/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, quantity })
+      })
+      .then(res => res.json())
+      .then(() => { playAddSound(); showToast('Added to cart!', 'success'); updateCartBadge(); })
+      .catch(() => showToast('Please log in first', 'error'));
+    }
+
+    function buyNow(productId) {
+      const quantity = parseInt(document.getElementById('qty').value);
+      fetch('/api/cart/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, quantity })
+      })
+      .then(res => res.json())
+      .then(() => location.href = 'checkout.html')
+      .catch(() => showToast('Please log in first', 'error'));
+    }
+
+    function toggleWishlist(productId) {
+      fetch('/api/wishlist/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('wishlistBtn').textContent = data.wishlisted ? '❤️' : '🤍';
+        showToast(data.wishlisted ? 'Added to wishlist!' : 'Removed from wishlist', 'success');
+      })
+      .catch(() => { location.href = 'login.html'; });
+    }
+
+    function loadReviews(productId) {
+      fetch('/api/reviews/' + productId)
+        .then(res => res.json())
+        .then(reviews => {
+          const list = document.getElementById('reviewList');
+          if (!reviews.length) {
+            list.innerHTML = '<p class="no-reviews">No reviews yet. Be the first!</p>';
+            return;
+          }
+          list.innerHTML = reviews.map(r => `
+            <div class="review-item">
+              <div class="review-header">
+                <strong>${r.user_name}</strong>
+                <span class="review-stars">${'⭐'.repeat(r.rating)}</span>
+              </div>
+              <p>${r.comment}</p>
+            </div>
+          `).join('');
+        });
+    }
+
+    function submitReview(productId) {
+      const comment = document.getElementById('reviewComment').value.trim();
+      if (!comment) return showToast('Please write a comment', 'error');
+
+      fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, rating: selectedRating, comment })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) return showToast(data.error, 'error');
+        showToast('Review submitted!', 'success');
+        document.getElementById('reviewComment').value = '';
+        selectedRating = 5;
+        updateStars();
+        loadReviews(productId);
+      })
+      .catch(() => showToast('Please log in to review', 'error'));
+    }
+  </script>
+</body>
+</html>

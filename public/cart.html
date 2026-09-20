@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cart</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content">
+      <h2>Your Cart</h2>
+      <div class="cart-layout">
+        <div id="cartItems" class="cart-items-col"></div>
+        <div class="cart-summary-col">
+          <div class="summary-box">
+            <p class="summary-title">Order Summary</p>
+            <div class="summary-row"><span>Subtotal</span><span id="subtotal">₹0.00</span></div>
+            <div class="summary-row"><span>Delivery</span><span class="free-text">FREE</span></div>
+            <div class="summary-row total-row"><span>Total</span><span id="cartTotal">₹0.00</span></div>
+            <button onclick="location.href='checkout.html'" id="checkoutBtn">Proceed to Checkout</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+
+    function loadCart() {
+      fetch('/api/cart')
+        .then(res => {
+          if (res.status === 401) {
+            showToast('Your session expired. Please log in again.', 'error');
+            setTimeout(() => location.href = 'login.html', 1200);
+            return null;
+          }
+          return res.json();
+        })
+        .then(items => {
+          if (!items) return;
+          const container = document.getElementById('cartItems');
+          if (!items.length) {
+            container.innerHTML = '<div class="empty-cart">Your cart is empty. <a href="index.html">Start shopping →</a></div>';
+            document.getElementById('checkoutBtn').disabled = true;
+            updateTotals(0);
+            return;
+          }
+          document.getElementById('checkoutBtn').disabled = false;
+          let total = 0;
+          container.innerHTML = items.map(i => {
+            const lineTotal = Number(i.price) * i.quantity;
+            total += lineTotal;
+            return `
+              <div class="cart-item-card">
+                <img src="${i.image}" class="cart-item-img" alt="${i.name}" onerror="this.src='https://picsum.photos/seed/${i.id}/500/500'">
+                <div class="cart-item-details">
+                  <h4>${i.name}</h4>
+                  <p class="cart-item-price">₹${Number(i.price).toFixed(2)}</p>
+                  <div class="qty-control">
+                    <button onclick="changeQty(${i.id}, ${i.quantity - 1})">−</button>
+                    <span>${i.quantity}</span>
+                    <button onclick="changeQty(${i.id}, ${i.quantity + 1})">+</button>
+                  </div>
+                  <div class="cart-item-actions">
+                    <a href="#" onclick="removeItem(${i.id}); return false;">Remove</a>
+                  </div>
+                </div>
+                <div class="cart-item-linetotal">₹${lineTotal.toFixed(2)}</div>
+              </div>
+            `;
+          }).join('');
+          updateTotals(total);
+        })
+        .catch(() => {
+          document.getElementById('cartItems').innerHTML = '<p>Could not load cart.</p>';
+        });
+    }
+
+    function updateTotals(total) {
+      document.getElementById('subtotal').innerText = '₹' + total.toFixed(2);
+      document.getElementById('cartTotal').innerText = '₹' + total.toFixed(2);
+    }
+
+    function changeQty(productId, newQty) {
+      if (newQty < 1) return removeItem(productId);
+      fetch('/api/cart/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, quantity: newQty })
+      }).then(loadCart);
+    }
+
+    function removeItem(productId) {
+      fetch('/api/cart/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId })
+      }).then(() => { showToast('Item removed', 'info'); loadCart(); });
+    }
+
+    loadCart();
+  </script>
+</body>
+</html>

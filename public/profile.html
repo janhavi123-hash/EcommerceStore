@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>My Profile</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content">
+      <h2>My Address</h2>
+      <div class="checkout-box" style="max-width:480px;">
+        <input type="text" id="fullName" placeholder="Full Name">
+        <input type="text" id="address" placeholder="Address">
+        <input type="text" id="city" placeholder="City">
+        <input type="text" id="pincode" placeholder="Pincode">
+        <input type="text" id="phone" placeholder="Phone Number">
+        <button onclick="saveAddress()">Save Address</button>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    fetch('/api/address').then(res => res.json()).then(addr => {
+      if (addr) {
+        fullName.value = addr.full_name || '';
+        address.value = addr.address || '';
+        city.value = addr.city || '';
+        pincode.value = addr.pincode || '';
+        phone.value = addr.phone || '';
+      }
+    });
+    function saveAddress() {
+      fetch('/api/address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: fullName.value, address: address.value,
+          city: city.value, pincode: pincode.value, phone: phone.value
+        })
+      }).then(() => showToast('Address saved!', 'success'));
+    }
+  </script>
+</body>
+</html>

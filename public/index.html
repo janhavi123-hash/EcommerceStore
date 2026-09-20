@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Store</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content">
+      <h2 id="welcomeMsg">Products</h2>
+      <div class="search-sort-row">
+        <input type="text" id="searchBox" class="search-box" placeholder="🔍 Search products...">
+        <select id="sortSelect" class="sort-select">
+          <option value="">Sort: Default</option>
+          <option value="price_asc">Price: Low to High</option>
+          <option value="price_desc">Price: High to Low</option>
+          <option value="rating">Rating: High to Low</option>
+        </select>
+      </div>
+      <div id="categoryTabs" class="category-tabs"></div>
+      <div id="productGrid" class="grid"></div>
+      <div id="recentlyViewedSection"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+
+    fetch('/api/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.loggedIn) {
+          document.getElementById('welcomeMsg').innerText = `Welcome back, ${data.user.name.split(' ')[0]} 👋`;
+        }
+      });
+
+    let currentCategory = 'All';
+    let currentSearch = '';
+    let currentSort = '';
+
+    function loadCategories() {
+      fetch('/api/categories')
+        .then(res => res.json())
+        .then(categories => {
+          const tabs = document.getElementById('categoryTabs');
+          const all = ['All', ...categories];
+          tabs.innerHTML = all.map(c => `
+            <button class="cat-tab ${c === currentCategory ? 'active' : ''}" onclick="filterCategory('${c}')">${c}</button>
+          `).join('');
+        });
+    }
+
+    function filterCategory(category) {
+      currentCategory = category;
+      loadCategories();
+      loadProducts();
+    }
+
+    function loadProducts() {
+      const params = new URLSearchParams();
+      if (currentCategory !== 'All') params.set('category', currentCategory);
+      if (currentSearch) params.set('search', currentSearch);
+      if (currentSort) params.set('sort', currentSort);
+      const url = '/api/products' + (params.toString() ? '?' + params.toString() : '');
+
+      fetch(url)
+        .then(res => res.json())
+        .then(products => {
+          const grid = document.getElementById('productGrid');
+          if (!products.length) {
+            grid.innerHTML = `
+              <div class="empty-search">
+                <p>No products found${currentSearch ? ` for "<strong>${currentSearch}</strong>"` : ''}.</p>
+                <p class="empty-search-suggest">Try browsing: 
+                  <a href="#" onclick="filterCategory('Electronics'); return false;">Electronics</a>, 
+                  <a href="#" onclick="filterCategory('Makeup'); return false;">Makeup</a>, 
+                  <a href="#" onclick="filterCategory('Essentials'); return false;">Essentials</a>
+                </p>
+              </div>`;
+            return;
+          }
+          grid.innerHTML = products.map(p => `
+            <a href="product.html?id=${p.id}" class="card">
+              <img src="${p.image}" class="card-img" alt="${p.name}" onerror="this.src='https://picsum.photos/seed/${p.id}/500/500'">
+              <span class="cat-badge">${p.category}</span>
+              <h3>${p.name}</h3>
+              <div class="rating">⭐ ${p.rating} <span class="review-count">(${p.review_count})</span></div>
+              <p>₹${Number(p.price).toFixed(2)}</p>
+              <span class="view-details-link">View Details →</span>
+            </a>
+          `).join('');
+        })
+        .catch(() => {
+          document.getElementById('productGrid').innerHTML = '<p>Could not load products.</p>';
+        });
+    }
+
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+      currentSearch = e.target.value.trim();
+      loadProducts();
+    });
+
+    document.getElementById('sortSelect').addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      loadProducts();
+    });
+
+    function loadRecentlyViewed() {
+      const recent = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+      if (!recent.length) return;
+
+      Promise.all(recent.map(id => fetch('/api/products/' + id).then(r => r.json())))
+        .then(products => {
+          const section = document.getElementById('recentlyViewedSection');
+          section.innerHTML = `
+            <h2 style="margin-top:2rem;">Recently Viewed</h2>
+            <div class="grid">
+              ${products.map(p => `
+                <a href="product.html?id=${p.id}" class="card">
+                  <img src="${p.image}" class="card-img" alt="${p.name}" onerror="this.src='https://picsum.photos/seed/${p.id}/500/500'">
+                  <span class="cat-badge">${p.category}</span>
+                  <h3>${p.name}</h3>
+                  <p>₹${Number(p.price).toFixed(2)}</p>
+                </a>
+              `).join('')}
+            </div>
+          `;
+        });
+    }
+
+    loadCategories();
+    loadProducts();
+    loadRecentlyViewed();
+  </script>
+</body>
+</html>

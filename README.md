@@ -3,6 +3,10 @@
 My Store is a full-stack e-commerce application built as a Simple E-commerce Store project — supporting product browsing, cart management, order processing, and real payment integration. Built from scratch using Node.js, Express, and MySQL.
 
 ---
+## Demo Video
+📹 [Watch the demo video](https://drive.google.com/file/d/1pMrVBAenVlpWpbYDoRkOkGJ_Fg8bIATv/view?usp=drivesdk)
+
+---
 
 ## Features
 
